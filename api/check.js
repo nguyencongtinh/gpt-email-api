@@ -1,52 +1,58 @@
-// /api/check.js
+// pages/api/check.js
+import { google } from 'googleapis';
+import { parse } from 'date-fns';
+
+const sheets = google.sheets('v4');
 
 export default async function handler(req, res) {
+  const email = req.query.email;
+  const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
+  const spreadsheetId = process.env.SPREADSHEET_ID;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Thiếu email cần kiểm tra.' });
+  }
+
   try {
-    const { email } = req.query;
+    const range = 'Sheet1!A1:B1000'; // Sửa tên sheet tại đây nếu cần
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range,
+      key: apiKey,
+    });
 
-    if (!email) {
-      return res.status(400).json({ error: 'Thiếu email.' });
-    }
+    const rows = response.data.values;
 
-    const SHEET_ID = process.env.SHEET_ID;
-    const API_KEY = process.env.GOOGLE_SHEETS_API_KEY;
-    const RANGE = 'Sheet1!A1:B1000';
-
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!data.values) {
+    if (!rows || rows.length === 0) {
       return res.status(500).json({ error: 'Không lấy được dữ liệu từ Google Sheets.' });
     }
 
-    const rows = data.values;
-    const header = rows[0];
-    const body = rows.slice(1);
+    // Duyệt qua từng dòng trong sheet
+    for (let i = 1; i < rows.length; i++) {
+      const rowEmail = rows[i][0]?.trim().toLowerCase();
+      const endDate = rows[i][1]?.trim(); // ô B: ngày hết hạn
 
-    const userRow = body.find(row => row[0]?.trim().toLowerCase() === email.trim().toLowerCase());
+      if (rowEmail === email.toLowerCase()) {
+        if (!endDate) {
+          // Nếu ô B trống => cho phép mãi mãi
+          return res.status(200).json({ access: true });
+        }
 
-    if (!userRow) {
-      return res.status(200).json({ access: false });
-    }
+        const today = new Date();
+        const expiryDate = parse(endDate, 'dd-MM-yyyy', new Date());
 
-    const expirationDateStr = userRow[1];
-
-    // Nếu có ngày hết hạn → kiểm tra
-    if (expirationDateStr) {
-      const expirationDate = new Date(expirationDateStr);
-      const now = new Date();
-      if (!isNaN(expirationDate.getTime()) && expirationDate < now) {
-        return res.status(200).json({ access: false }); // Hết hạn
+        if (today <= expiryDate) {
+          return res.status(200).json({ access: true });
+        } else {
+          return res.status(200).json({ access: false, reason: 'Hết hạn sử dụng' });
+        }
       }
     }
 
-    // Nếu không có ngày hết hạn hoặc còn hạn
-    return res.status(200).json({ access: true });
+    return res.status(200).json({ access: false, reason: 'Không có trong danh sách' });
 
   } catch (error) {
-    console.error('Lỗi check quyền truy cập:', error);
-    return res.status(500).json({ error: 'Lỗi server nội bộ.' });
+    console.error('Lỗi truy cập Google Sheets:', error);
+    return res.status(500).json({ error: 'Lỗi server: không thể kiểm tra quyền truy cập.' });
   }
 }
