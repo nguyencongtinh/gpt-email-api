@@ -1,15 +1,9 @@
 {
-  "version": 2,
-  "builds": [
+  "outputDirectory": "public",
+  "rewrites": [
     {
-      "src": "index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/check",
-      "dest": "index.js"
+      "source": "/openapi.yaml",
+      "destination": "/openapi.yaml"
     }
   ]
 }
