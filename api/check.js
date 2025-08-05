@@ -1,24 +1,33 @@
-const fetch = require('node-fetch'); // Thêm dòng này nếu chưa có
+const fetch = require('node-fetch');
 
 module.exports = async (req, res) => {
-  const { email } = req.query;
-  const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
-  const sheetId = '1VlcDnu_rc_shvzOmyQv_wO-nHDWmHxYmpD3-UhGN91Q';
-
-  if (!email) {
-    return res.status(400).json({ error: 'Missing email' });
-  }
-
   try {
-    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Sheet1!A:A?key=${apiKey}`);
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Thiếu email trong query string.' });
+    }
+
+    const sheetId = '1VlcDnu_rc_shvzOmyQv_wO-nHDWmHxYmpD3-UhGN91Q';
+    const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
+    const range = 'Sheet1!A:A';
+
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
+
+    const response = await fetch(url);
     const data = await response.json();
 
-    const emails = Array.isArray(data.values) ? data.values.flat().map(e => e.toLowerCase()) : [];
-    const hasAccess = emails.includes(email.toLowerCase());
+    if (!data.values) {
+      console.error('[Sheets API ERROR]', data);
+      return res.status(500).json({ error: 'Không lấy được dữ liệu từ Google Sheets.' });
+    }
 
-    return res.status(200).json({ access: hasAccess });
-  } catch (err) {
-    console.error('Lỗi khi gọi Google Sheets API:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    const emails = data.values.flat().map(e => e.toLowerCase().trim());
+    const found = emails.includes(email.toLowerCase().trim());
+
+    return res.status(200).json({ access: found });
+  } catch (error) {
+    console.error('[SERVER ERROR]', error);
+    return res.status(500).json({ error: 'Lỗi server nội bộ.' });
   }
 };
