@@ -1,54 +1,52 @@
-import { google } from 'googleapis';
-import dayjs from 'dayjs';
+// /api/check.js
 
 export default async function handler(req, res) {
-  const { email } = req.query;
-
-  if (!email) {
-    return res.status(400).json({ error: 'Missing email' });
-  }
-
-  const sheets = google.sheets({
-    version: 'v4',
-    auth: process.env.GOOGLE_SHEETS_API_KEY,
-  });
-
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.SPREADSHEET_ID,
-      range: 'Sheet1!A2:B',
-    });
+    const { email } = req.query;
 
-    const rows = response.data.values;
+    if (!email) {
+      return res.status(400).json({ error: 'Thiếu email.' });
+    }
 
-    if (!rows || rows.length === 0) {
+    const SHEET_ID = process.env.SHEET_ID;
+    const API_KEY = process.env.GOOGLE_SHEETS_API_KEY;
+    const RANGE = 'Sheet1!A1:B1000';
+
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}?key=${API_KEY}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!data.values) {
+      return res.status(500).json({ error: 'Không lấy được dữ liệu từ Google Sheets.' });
+    }
+
+    const rows = data.values;
+    const header = rows[0];
+    const body = rows.slice(1);
+
+    const userRow = body.find(row => row[0]?.trim().toLowerCase() === email.trim().toLowerCase());
+
+    if (!userRow) {
       return res.status(200).json({ access: false });
     }
 
-    const today = dayjs();
+    const expirationDateStr = userRow[1];
 
-    for (const row of rows) {
-      const [sheetEmail, expirationDateStr] = row;
-
-      if (sheetEmail && sheetEmail.trim().toLowerCase() === email.trim().toLowerCase()) {
-        // Nếu không có ngày hết hạn → quyền truy cập không giới hạn
-        if (!expirationDateStr) {
-          return res.status(200).json({ access: true });
-        }
-
-        const expirationDate = dayjs(expirationDateStr);
-
-        if (expirationDate.isValid() && today.isBefore(expirationDate.add(1, 'day'))) {
-          return res.status(200).json({ access: true });
-        } else {
-          return res.status(200).json({ access: false });
-        }
+    // Nếu có ngày hết hạn → kiểm tra
+    if (expirationDateStr) {
+      const expirationDate = new Date(expirationDateStr);
+      const now = new Date();
+      if (!isNaN(expirationDate.getTime()) && expirationDate < now) {
+        return res.status(200).json({ access: false }); // Hết hạn
       }
     }
 
-    return res.status(200).json({ access: false });
+    // Nếu không có ngày hết hạn hoặc còn hạn
+    return res.status(200).json({ access: true });
+
   } catch (error) {
-    console.error('API Error:', error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Lỗi check quyền truy cập:', error);
+    return res.status(500).json({ error: 'Lỗi server nội bộ.' });
   }
-};
+}
