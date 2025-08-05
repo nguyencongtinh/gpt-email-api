@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
 
     const sheetId = '1VlcDnu_rc_shvzOmyQv_wO-nHDWmHxYmpD3-UhGN91Q';
     const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
-    const range = 'Sheet1!A1:B1000'; // Cột A: email, Cột B: ngày hết hạn (dd-MM-yyyy)
+    const range = 'Sheet1!A1:B1000'; // Cột A: email, Cột B: ngày hết hạn (dd/MM/yyyy)
 
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
     const response = await fetch(url);
@@ -25,14 +25,14 @@ module.exports = async (req, res) => {
 
     for (let i = 1; i < data.values.length; i++) {
       const rowEmail = data.values[i][0]?.trim().toLowerCase();
-      const expiry = data.values[i][1]?.trim(); // định dạng: dd-MM-yyyy
+      const expiry = data.values[i][1]?.trim(); // định dạng: dd/MM/yyyy
 
       if (rowEmail === email.toLowerCase()) {
         if (!expiry) {
           return res.status(200).json({ access: true });
         }
 
-        const [day, month, year] = expiry.split('-').map(Number);
+        const [day, month, year] = expiry.split('/').map(Number);
         const expiryDate = new Date(year, month - 1, day);
 
         if (today <= expiryDate) {
