@@ -1,0 +1,48 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Email Access Checker",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://gpt-access-check.vercel.app"
+    }
+  ],
+  "paths": {
+    "/api/check": {
+      "get": {
+        "operationId": "checkEmail",
+        "summary": "Check if email is allowed to access GPT",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The email address to check"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Access result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "access": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
