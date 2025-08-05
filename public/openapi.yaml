@@ -1,0 +1,28 @@
+openapi: 3.0.0
+info:
+  title: Email Access Checker API
+  description: Check if a user's email is in the allowlist
+  version: "1.0.0"
+servers:
+  - url: https://gpt-email-api.vercel.app
+paths:
+  /api/check:
+    get:
+      summary: Check email access
+      parameters:
+        - in: query
+          name: email
+          schema:
+            type: string
+          required: true
+          description: Email address to check
+      responses:
+        '200':
+          description: Access result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access:
+                    type: boolean
