@@ -1,4 +1,4 @@
-openapi: 3.0.0
+openapi: 3.1.0
 info:
   title: Email Access Checker API
   description: Check if a user's email is in the allowlist
@@ -9,6 +9,7 @@ paths:
   /api/check:
     get:
       summary: Check email access
+      operationId: checkEmailAccess
       parameters:
         - in: query
           name: email
