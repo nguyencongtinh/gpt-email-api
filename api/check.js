@@ -55,4 +55,4 @@ export default async function handler(req, res) {
     console.error('Lỗi truy cập Google Sheets:', error);
     return res.status(500).json({ error: 'Lỗi server: không thể kiểm tra quyền truy cập.' });
   }
-}
+};
