@@ -1,7 +1,19 @@
-// File giả lập – Anh cần thay bằng logic thật lấy dữ liệu từ Google Sheets và gửi Gmail
 
-export async function sendReminderEmails() {
-  console.log("Simulating sending reminder emails...");
-  // TODO: Connect to Google Sheets API, check expiry, send email via Gmail API
+const { google } = require('googleapis');
+const { JWT } = require('google-auth-library');
+
+const SCOPES = [
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/gmail.send'
+];
+
+function authorizeServiceAccount(credentials) {
+  const client = new JWT({
+    email: credentials.client_email,
+    key: credentials.private_key,
+    scopes: SCOPES,
+  });
+  return client;
 }
 
+module.exports = { authorizeServiceAccount };
