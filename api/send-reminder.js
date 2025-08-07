@@ -1,12 +1,12 @@
-import { sendReminderEmails } from '../utils/send-reminder-logic';
+const { sendReminderEmails } = require("../utils/send-reminder-logic");
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
+  console.log("🔔 Đang gọi sendReminderEmails...");
   try {
-    console.log("🔔 Đang gọi sendReminderEmails...");
     await sendReminderEmails();
-    res.status(200).send("Reminder emails sent successfully.");
-  } catch (err) {
-    console.error("❌ Lỗi khi gửi email: ", err);
-    res.status(500).send("Failed to send reminder emails.");
+    res.status(200).send("✅ Đã gửi email nhắc hạn (nếu có).");
+  } catch (error) {
+    console.error("❌ Lỗi khi gửi email: ", error);
+    res.status(500).send("❌ Lỗi khi gửi email.");
   }
-}
+};
