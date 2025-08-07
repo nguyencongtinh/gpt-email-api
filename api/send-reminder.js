@@ -1,4 +1,4 @@
-const { sendReminderEmails } = require('../utils/google-auth');
+import { sendReminderEmails } from '../utils/send-reminder-logic';
 
 export default async function handler(req, res) {
   try {
