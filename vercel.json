@@ -6,12 +6,14 @@
       "destination": "/openapi.yaml"
     }
   ],
+ {
   "version": 2,
-  "functions": {
-    "api/send-reminder.js": {
-      "runtime": "nodejs18.x"
+  "builds": [
+    {
+      "src": "api/send-reminder.js",
+      "use": "@vercel/node"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/api/send-reminder",
