@@ -6,6 +6,9 @@ async function sendReminderEmails() {
   const gmail = google.gmail({ version: "v1", auth });
 
   const spreadsheetId = process.env.SPREADSHEET_ID;
+
+console.log("🧪 [DEBUG] SPREADSHEET_ID:", spreadsheetId);
+  
   const sheetName = process.env.SHEET_NAME || "Sheet1";
 
   const response = await sheets.spreadsheets.values.get({
