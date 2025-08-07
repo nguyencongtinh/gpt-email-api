@@ -1,5 +1,21 @@
 {
+  "version": 2,
   "outputDirectory": "public",
+  "functions": {
+    "api/send-reminder.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/send-reminder",
+      "dest": "api/send-reminder.js"
+    },
+    {
+      "source": "/openapi.yaml",
+      "destination": "/openapi.yaml"
+    }
+  ],
   "rewrites": [
     {
       "source": "/openapi.yaml",
@@ -7,3 +23,4 @@
     }
   ]
 }
+
