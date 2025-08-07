@@ -1,5 +1,3 @@
-console.log('📄 SHEET_ID:', process.env.SHEET_ID);
-
 const auth = require("./google-auth");
 const { google } = require("googleapis");
 
