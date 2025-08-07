@@ -19,5 +19,5 @@
       "src": "/api/send-reminder",
       "dest": "api/send-reminder.js"
     }
-  ]
+  ],
 }
