@@ -1,19 +1,9 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/send-reminder.js",
-      "use": "@vercel/node"
-    }
-  ],
+  "outputDirectory": "public",
   "routes": [
     {
-      "src": "/api/send-reminder",
-      "dest": "api/send-reminder.js"
-    },
-    {
       "src": "/openapi.yaml",
-      "dest": "public/openapi.yaml"
+      "dest": "/openapi.yaml"
     }
   ]
 }
