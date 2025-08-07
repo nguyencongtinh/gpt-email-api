@@ -1,4 +1,3 @@
-
 const { google } = require('googleapis');
 const { JWT } = require('google-auth-library');
 
@@ -16,4 +15,16 @@ function authorizeServiceAccount(credentials) {
   return client;
 }
 
-module.exports = { authorizeServiceAccount };
+async function sendReminderEmails() {
+  console.log("🔔 Đang gọi sendReminderEmails...");
+  const credentials = require('../../credentials.json');
+  const authClient = authorizeServiceAccount(credentials);
+  
+  // TODO: Thêm phần gửi email
+  console.log("✅ Xử lý gửi email xong.");
+}
+
+module.exports = {
+  authorizeServiceAccount,
+  sendReminderEmails
+};
