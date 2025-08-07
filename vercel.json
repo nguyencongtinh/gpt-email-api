@@ -11,12 +11,5 @@
       "src": "/api/send-reminder",
       "dest": "api/send-reminder.js"
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/openapi.yaml",
-      "destination": "/openapi.yaml"
-    }
-  ],
-  "outputDirectory": "public"
+  ]
 }
