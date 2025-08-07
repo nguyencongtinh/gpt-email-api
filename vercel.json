@@ -10,6 +10,10 @@
     {
       "src": "/api/send-reminder",
       "dest": "api/send-reminder.js"
+    },
+    {
+      "src": "/openapi.yaml",
+      "dest": "public/openapi.yaml"
     }
   ]
 }
