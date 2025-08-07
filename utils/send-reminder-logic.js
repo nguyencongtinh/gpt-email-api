@@ -8,7 +8,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.send'
 ];
 
-const SHEET_ID = 'YOUR_SHEET_ID'; // TODO: Replace with actual Sheet ID
+const SHEET_ID = '1VlcDnu_rc_shvzOmyQv_wO-nHDWmHxYmpD3-UhGN91Q'; // TODO: Replace with actual Sheet ID
 
 async function sendReminderEmails() {
   const auth = new JWT({
