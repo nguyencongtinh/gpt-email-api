@@ -1,30 +1,12 @@
-const { google } = require('googleapis');
-const { JWT } = require('google-auth-library');
+const { sendReminderEmails } = require('../utils/google-auth');
 
-const SCOPES = [
-  'https://www.googleapis.com/auth/spreadsheets',
-  'https://www.googleapis.com/auth/gmail.send'
-];
-
-function authorizeServiceAccount(credentials) {
-  const client = new JWT({
-    email: credentials.client_email,
-    key: credentials.private_key,
-    scopes: SCOPES,
-  });
-  return client;
+export default async function handler(req, res) {
+  try {
+    console.log("🔔 Đang gọi sendReminderEmails...");
+    await sendReminderEmails();
+    res.status(200).send("Reminder emails sent successfully.");
+  } catch (err) {
+    console.error("❌ Lỗi khi gửi email: ", err);
+    res.status(500).send("Failed to send reminder emails.");
+  }
 }
-
-async function sendReminderEmails() {
-  console.log("🔔 Đang gọi sendReminderEmails...");
-  const credentials = require('../../credentials.json');
-  const authClient = authorizeServiceAccount(credentials);
-  
-  // TODO: Thêm phần gửi email
-  console.log("✅ Xử lý gửi email xong.");
-}
-
-module.exports = {
-  authorizeServiceAccount,
-  sendReminderEmails
-};
