@@ -1,12 +1,4 @@
 {
-  "outputDirectory": "public",
-  "rewrites": [
-    {
-      "source": "/openapi.yaml",
-      "destination": "/openapi.yaml"
-    }
-  ],
- {
   "version": 2,
   "builds": [
     {
@@ -20,4 +12,11 @@
       "dest": "api/send-reminder.js"
     }
   ],
+  "rewrites": [
+    {
+      "source": "/openapi.yaml",
+      "destination": "/openapi.yaml"
+    }
+  ],
+  "outputDirectory": "public"
 }
