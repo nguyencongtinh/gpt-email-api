@@ -19,7 +19,7 @@ async function sendReminderEmails() {
   const header = rows[0];
   const emailIndex = header.indexOf("Email cho phép sử dụng GPTs");
   const expireDateIndex = header.indexOf("Thời hạn sử dụng");
-  const gptNameIndex = header.indexOf("GPTs ID");
+  const gptIdIndex = header.indexOf("GPTs ID");
   const gptNameIndex = header.indexOf("Tên GPTs");
   const sent5Index = header.indexOf("Đã gửi trước 5 ngày");
   const sent1Index = header.indexOf("Đã gửi trước 1 ngày");
