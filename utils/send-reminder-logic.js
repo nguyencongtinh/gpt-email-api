@@ -1,12 +1,5 @@
 const auth = require("./google-auth");
 const { google } = require("googleapis");
-
-
-const spreadsheetId = process.env.SPREADSHEET_ID || "1VlcDnu_rc_shvzOmyQv_wO-nHDWmHxYmpD3-UhGN91Q";
-if (!process.env.SPREADSHEET_ID) {
-  console.error("⚠️ Thiếu biến môi trường SPREADSHEET_ID!");
-}
-
 async function sendReminderEmails() {
   const sheets = google.sheets({ version: "v4", auth });
   const gmail = google.gmail({ version: "v1", auth });
@@ -24,8 +17,9 @@ async function sendReminderEmails() {
   const today = new Date();
   const msPerDay = 24 * 60 * 60 * 1000;
   const header = rows[0];
-  const emailIndex = header.indexOf("Email");
-  const expireDateIndex = header.indexOf("Hạn dùng");
+  const emailIndex = header.indexOf("Email cho phép sử dụng GPTs");
+  const expireDateIndex = header.indexOf("Thời hạn sử dụng");
+  const gptNameIndex = header.indexOf("GPTs ID");
   const gptNameIndex = header.indexOf("Tên GPTs");
   const sent5Index = header.indexOf("Đã gửi trước 5 ngày");
   const sent1Index = header.indexOf("Đã gửi trước 1 ngày");
