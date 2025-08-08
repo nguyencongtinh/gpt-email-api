@@ -2,15 +2,8 @@
   "name": "gpt-email-api",
   "version": "1.0.0",
   "main": "index.js",
-  "dependencies": {
-    "express": "^4.18.2",
-    "node-fetch": "^2.7.0",
-    "googleapis": "^121.0.0",
-    "google-auth-library": "^9.0.0",
-    "google-spreadsheet": "^3.3.0"
-  }
-  "engines": {
-  "node": "18.x"
+ "dependencies": {
+  "express": "^4.18.2",
+  "node-fetch": "^2.7.0"
 }
-
 }
