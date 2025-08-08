@@ -1,0 +1,29 @@
+name: ⏰ Gửi nhắc hạn GPTs tự động
+on:
+  schedule:
+    - cron: "0 17 * * *"    # 0h VN (tức 17h UTC hôm trước)
+  workflow_dispatch:
+
+jobs:
+  send-gpt-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cài dependency
+        run: npm install
+
+      - name: Chạy script gửi nhắc hạn GPTs
+        run: node send-gpt-expiry-reminder.js
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+          GOOGLE_CLIENT_EMAIL: ${{ secrets.GOOGLE_CLIENT_EMAIL }}
+          GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
