@@ -12,4 +12,4 @@ jobs:
     steps:
       - name: 🔔 Gửi yêu cầu tới API nhắc hạn
         run: |
-          curl -X GET "https://gpt-email-api.vercel.app/api/send-reminder"
+          curl -X GET https://gpt-email-api.vercel.app/api/send-reminder
