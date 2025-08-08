@@ -1,24 +1,15 @@
-name: Daily GPT Reminder Email
+name: ⏰ Daily GPT Expiry Reminder
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 1 * * *' # Mỗi ngày 08:00 sáng giờ VN (1h UTC)
   workflow_dispatch:
 
 jobs:
-  send-reminder:
+  trigger-reminder:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Trigger reminder API
-        run: curl -X GET https://gpt-email-api.vercel.app/api/send-reminder
+      - name: 🔔 Gửi yêu cầu tới API nhắc hạn
+        run: |
+          curl -X GET "https://gpt-email-api.vercel.app/api/send-reminder"
