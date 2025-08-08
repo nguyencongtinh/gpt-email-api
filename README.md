@@ -1,7 +1,7 @@
 # GPT Email API & GPT Expiry Reminder
 
 ## Tính năng repo này
-- API xác thực email, deploy trên Vercel: `/api/check-email.js`
+- API xác thực email, deploy trên Vercel: `/api/check.js`
 - Script tự động gửi nhắc hạn GPTs, chạy mỗi ngày qua GitHub Actions: `send-gpt-expiry-reminder.js`
 
 ## Sử dụng
