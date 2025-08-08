@@ -3,8 +3,9 @@ const { google } = require("googleapis");
 
 
 const spreadsheetId = process.env.SPREADSHEET_ID || "1VlcDnu_rc_shvzOmyQv_wO-nHDWmHxYmpD3-UhGN91Q";
-
-
+if (!process.env.SPREADSHEET_ID) {
+  console.error("⚠️ Thiếu biến môi trường SPREADSHEET_ID!");
+}
 
 async function sendReminderEmails() {
   const sheets = google.sheets({ version: "v4", auth });
