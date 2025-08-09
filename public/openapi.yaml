@@ -1,25 +1,38 @@
 openapi: 3.1.0
 info:
-  title: Email Access Checker API
-  description: Check if a user's email is in the allowlist
-  version: "1.0.0"
+  title: GPT Access Checker API
+  version: 1.1.2
+  description: "Check access by email + GPT ID + GPT Name + expiry. If header x-gpt-key is sent, the server maps it to id/name; the spec lists only query params."
 servers:
   - url: https://gpt-email-api.vercel.app
 paths:
   /api/check:
     get:
-      summary: Check email access
-      operationId: checkEmailAccess
+      summary: Check user access
+      operationId: checkAccess
       parameters:
-        - in: query
-          name: email
+        - name: email
+          in: query
+          required: true
+          description: User email to check
           schema:
             type: string
-          required: true
-          description: Email address to check
+            format: email
+        - name: gpt
+          in: query
+          required: false
+          description: GPT ID (e.g. gpt-bc, gpt-ga). Required if header mapping is not used.
+          schema:
+            type: string
+        - name: name
+          in: query
+          required: false
+          description: GPT Name (e.g. Tro ly Bao cao). Required if header mapping is not used.
+          schema:
+            type: string
       responses:
-        '200':
-          description: Access result
+        "200":
+          description: OK
           content:
             application/json:
               schema:
@@ -27,3 +40,21 @@ paths:
                 properties:
                   access:
                     type: boolean
+                  gpt:
+                    type: string
+                  name:
+                    type: string
+                    nullable: true
+                  expiry:
+                    type: string
+                    nullable: true
+                    description: "dd/MM/yyyy or null (no limit)"
+                  daysLeft:
+                    type: integer
+                    nullable: true
+                  match:
+                    type: string
+                    enum: [exact, wildcard, none]
+                  error:
+                    type: string
+                    nullable: true
