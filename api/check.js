@@ -6,7 +6,7 @@ import { JWT } from "google-auth-library";
 const GPT_KEY_MAP = {
   "BC_01": "gpt-bc",      // Trợ lý Báo cáo
   "GA_01": "gpt-ga",      // Trợ lý Giáo án
-  "VD_01": "gpt-video",   // Trợ lý Videos
+  "VD_01": "gpt-vid",   // Trợ lý Videos
   // Thêm các GPT khác tại đây...
 };
 
