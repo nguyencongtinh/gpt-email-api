@@ -2,127 +2,204 @@
 import { google } from "googleapis";
 import { JWT } from "google-auth-library";
 
-/** ======== ENV & CONFIG (bắt buộc có SHEET_ID) ======== */
+/** ===== ENV / CONFIG ===== */
 const SHEET_ID     = process.env.SHEET_ID;
-const SHEET_NAME   = process.env.SHEET_NAME || "";          // rỗng = sheet đầu
-const SHEET_RANGE  = process.env.SHEET_RANGE || "1:10000";  // đọc cả header
+const SHEET_NAME   = process.env.SHEET_NAME || "";
+const SHEET_RANGE  = process.env.SHEET_RANGE || "1:10000";
 
-// KHÓA HEADER -> { id, name } (điền đúng tên 3 GPT của anh)
+// Map header -> { id, name } (điền nếu dùng header)
 const GPT_KEY_MAP = {
-  // Ví dụ (bật header để khỏi phải truyền query name/id):
   // "BC_01": { id: "gpt-bc",  name: "Trợ lý Báo cáo" },
   // "GA_01": { id: "gpt-ga",  name: "Trợ lý Giáo án" },
-  // "VD_01": { id: "gpt-vid", name: "Trợ lý Video"  }, // chú ý: sheet anh đang là gpt-vid
+  // "VD_01": { id: "gpt-vid", name: "Trợ lý Video"  },
 };
 
-/** ======== TÊN CỘT LINH HOẠT ======== */
+/** ===== HEADER NAMES (linh hoạt) ===== */
 const HDR = {
-  EMAIL:   ["email", "email được phép sử dụng gpts", "địa chỉ email", "email duoc phep su dung gpts", "mail"],
+  EMAIL:   ["email", "email duoc phep su dung gpts", "email được phép sử dụng gpts", "địa chỉ email", "mail"],
   EXPIRE:  ["thời hạn sử dụng", "thời hạn sử dụng gpts", "ngày hết hạn", "hạn sử dụng", "thoi han su dung", "han su dung", "expiry", "expiration", "expire"],
   GPT_ID:  ["gpts id", "gpt id", "mã gpt", "ma gpt", "id"],
-  GPT_NAME:["tên gpts", "ten gpts", "ten gpt", "gpts name", "tên gpt", "name", "ten"],
+  GPT_NAME:["tên gpts", "ten gpts", "gpts name","ten gpt", "tên gpt", "name", "ten"],
 };
 
-/** ======== HELPERS ======== */
+/** ===== Helpers ===== */
 const normLower = (s="") => String(s).trim().toLowerCase();
-const stripDia  = (s="") => s.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-const normHead  = (s="") => stripDia(normLower(s));
+const stripDia  = (s="") => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+const normNoDia = (s="") => stripDia(s).toLowerCase().trim();
 
-function headIndex(row, cands){
-  const want = cands.map(normHead);
-  for (let i=0;i<row.length;i++){ const h=normHead(row[i]||""); if (want.includes(h)) return i; }
-  for (let i=0;i<row.length;i++){ const h=normHead(row[i]||""); if (want.some(w=>h.startsWith(w)||w.startsWith(h))) return i; }
-  for (let i=0;i<row.length;i(){ const h=normHead(row[i]||""); if (want.some(w=>h.includes(w)||w.includes(h))) return i; }
+function headerIndex(headerRow, candidates){
+  const want = candidates.map(x => normNoDia(x));
+  // exact
+  for (let i=0;i<headerRow.length;i++){
+    const h = normNoDia(headerRow[i] || "");
+    if (want.includes(h)) return i;
+  }
+  // startsWith 2 chiều
+  for (let i=0;i<headerRow.length;i++){
+    const h = normNoDia(headerRow[i] || "");
+    if (want.some(w => h.startsWith(w) || w.startsWith(h))) return i;
+  }
+  // includes
+  for (let i=0;i<headerRow.length;i++){
+    const h = normNoDia(headerRow[i] || "");
+    if (want.some(w => h.includes(w) || w.includes(h))) return i;
+  }
   return -1;
 }
 
-const startOfDay = d => { const x=new Date(d); x.setHours(0,0,0,0); return x; };
-
+function startOfDay(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
 function parseDate(s){
-  const t=String(s||"").trim();
-  if(!t) return null;
-  const mVn=/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(t);
-  if(mVn) return new Date(+mVn[3], +mVn[2]-1, +mVn[1]);
-  const mIso=/^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
-  if(mIso) return new Date(+mIso[1], +mIso[2]-1, +mIso[3]);
-  const n=Number(t);
-  if(!Number.isNaN(n) && n>25000){ const base=new Date(Date.UTC(1899,11,30)); return new Date(base.getTime()+n*86400000); }
+  const t = String(s||"").trim();
+  if (!t) return null;
+  const mVn = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(t);
+  if (mVn) return new Date(+mVn[3], +mVn[2]-1, +mVn[1]);
+  const mIso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if (mIso) return new Date(+mIso[1], +mIso[2]-1, +mIso[3]);
+  const n = Number(t);
+  if (!Number.isNaN(n) && n > 25000){
+    const base = new Date(Date.UTC(1899,11,30));
+    return new Date(base.getTime() + n*86400000);
+  }
   return null;
 }
-
-// Expiry rỗng = không giới hạn
+// expiry rỗng => không giới hạn
 function notExpired(expiryStr){
-  if(!expiryStr || String(expiryStr).trim()==="") return true;
-  const d=parseDate(expiryStr); if(!d) return false;
+  if (!expiryStr || String(expiryStr).trim()==="") return true;
+  const d = parseDate(expiryStr);
+  if (!d) return false;
   return startOfDay(d) >= startOfDay(new Date());
 }
 function daysLeft(expiryStr){
-  if(!expiryStr || String(expiryStr).trim()==="") return Infinity;
-  const d=parseDate(expiryStr); if(!d) return -9999;
-  return Math.round((startOfDay(d)-startOfDay(new Date()))/86400000);
+  if (!expiryStr || String(expiryStr).trim()==="") return Infinity;
+  const d = parseDate(expiryStr);
+  if (!d) return -9999;
+  return Math.round((startOfDay(d) - startOfDay(new Date()))/86400000);
 }
 
-/** ======== MAIN ======== */
+/** ===== Main handler ===== */
 export default async function handler(req, res){
   try{
-    if(!SHEET_ID) return res.status(500).json({access:false,error:"Missing SHEET_ID env var"});
+    if (!SHEET_ID) return res.status(500).json({access:false,error:"Missing SHEET_ID env var"});
 
+    // 1) Lấy tham số đầu vào (an toàn)
     const email = normLower(req.query.email || "");
-    // Ưu tiên header; nếu không có thì dùng query (?gpt=&name=)
-    const key   = String(req.headers["x-gpt-key"]||"").trim();
+    const key   = String(req.headers["x-gpt-key"] || "").trim();
     const map   = key ? GPT_KEY_MAP[key] : null;
 
-    const gptId   = normLower(map?.id   || req.query.gpt   || "");
-    const gptName = normLower(map?.name || req.query.name  || ""); // BẮT BUỘC
+    const expectedId = normLower(map?.id || req.query.gpt || "");
+    // decode name an toàn (tránh 500 khi decode lỗi)
+    let rawName = map?.name ?? req.query.name ?? "";
+    try { rawName = decodeURIComponent(rawName); } catch (_e) { /* giữ nguyên nếu lỗi */ }
+    const expectedName = normNoDia(rawName);
 
-    if(!email || !gptId || !gptName){
-      return res.status(400).json({access:false,error:"Missing params: email + gpt + name (or use x-gpt-key mapping)."});
+    if (!email || !expectedId || !expectedName){
+      return res.status(400).json({
+        access:false,
+        error:"Missing params: email & gpt & name (or use x-gpt-key mapping)."
+      });
     }
 
-    // Auth (cần quyền sửa để tô màu Expiry)
+    // 2) Auth (cần quyền sửa để tô màu)
     const auth = new JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      key: (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g,"\n"),
+      key: (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
       scopes: ["https://www.googleapis.com/auth/spreadsheets"]
     });
-    const sheets = google.sheets({version:"v4", auth});
+    const sheets = google.sheets({ version:"v4", auth });
 
-    // Đọc dữ liệu
-    const range = (SHEET_NAME?`${SHEET_NAME}!`:"") + SHEET_RANGE;
-    const resp  = await sheets.spreadsheets.values.get({ spreadsheetId:SHEET_ID, range });
+    // 3) Đọc dữ liệu
+    const range = (SHEET_NAME ? `${SHEET_NAME}!` : "") + SHEET_RANGE;
+    const resp  = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range });
     const values = resp.data.values || [];
-    if(values.length===0) return res.status(200).json({access:false,gpt:gptId,name:gptName,expiry:null,debug:"Sheet empty"});
+    if (values.length === 0) {
+      return res.status(200).json({ access:false, gpt: expectedId, name: rawName || null, expiry:null, debug:"Sheet empty" });
+    }
 
     const header = values[0];
-    const idxEmail   = headIndex(header, HDR.EMAIL);
-    const idxExpiry  = headIndex(header, HDR.EXPIRE);
-    const idxGptId   = headIndex(header, HDR.GPT_ID);
-    const idxGptName = headIndex(header, HDR.GPT_NAME);
+    const idxEmail   = headerIndex(header, HDR.EMAIL);
+    const idxExpiry  = headerIndex(header, HDR.EXPIRE);
+    const idxGptId   = headerIndex(header, HDR.GPT_ID);
+    const idxGptName = headerIndex(header, HDR.GPT_NAME);
 
-    if(idxEmail<0 || idxExpiry<0 || idxGptId<0 || idxGptName<0){
-      return res.status(500).json({access:false,error:"Header mapping failed",headers:header});
+    if (idxEmail < 0 || idxExpiry < 0 || idxGptId < 0 || idxGptName < 0) {
+      return res.status(500).json({ access:false, error:"Header mapping failed", headers: header });
     }
 
-    // Ưu tiên Exact > Wildcard (*)
-    let exactRow=-1, exactExp=null;
-    let starRow=-1,  starExp=null;
+    // 4) Tìm dòng: ưu tiên EXACT (Email+ID+Name) > WILDCARD (ID='*' & Name='*'/trống)
+    let exactRow=-1, exactEx=null;
+    let starRow=-1,  starEx=null;
 
-    for(let i=1;i<values.length;i++){
+    for (let i=1;i<values.length;i++){
       const row = values[i] || [];
-      const e = normLower(row[idxEmail]   || "");
-      const id= normLower(row[idxGptId]   || "");
-      const nm= normLower(row[idxGptName] || "");
-      if(e!==email) continue;
+      const e = normLower(row[idxEmail]  || "");
+      const id= normLower(row[idxGptId]  || "");
+      const nm= normNoDia(row[idxGptName] || "");
+      if (e !== email) continue;
 
-      // Exact: Email + ID + Name
-      if(id===gptId && nm===gptName){
-        exactRow=i; exactExp=row[idxExpiry]||""; break;
+      if (id === expectedId && nm === expectedName){
+        exactRow = i; exactEx = row[idxExpiry] || ""; break;
       }
-
-      // Wildcard: ID="*" & Name="*" hoặc rỗng
-      if(id==="*" && (nm==="*" || nm==="")){
-        if(starRow===-1){ starRow=i; starExp=row[idxExpiry]||""; }
+      if (id === "*" && (nm === "*" || nm === "")){
+        if (starRow === -1){ starRow = i; starEx = row[idxExpiry] || ""; }
       }
     }
 
-    let usedRow=-1, expiryC
+    let usedRow=-1, expiryCell=null;
+    if (exactRow > 0) { usedRow = exactRow; expiryCell = exactEx; }
+    else if (starRow > 0) { usedRow = starRow; expiryCell = starEx; }
+
+    const access = usedRow > 0 ? notExpired(expiryCell) : false;
+
+    // 5) Tô màu ô Expiry nếu có dòng được dùng
+    if (usedRow > 0){
+      const meta = await sheets.spreadsheets.get({
+        spreadsheetId: SHEET_ID,
+        fields: "sheets(properties(sheetId,title))"
+      });
+      const sheetProp = SHEET_NAME
+        ? meta.data.sheets.find(s => (s.properties?.title || "") === SHEET_NAME)
+        : meta.data.sheets[0];
+      const sheetId = sheetProp?.properties?.sheetId;
+
+      if (sheetId != null){
+        const RED={red:0.99,green:0.91,blue:0.91};
+        const YEL={red:1.00,green:0.97,blue:0.85};
+        const WHITE={red:1.00,green:1.00,blue:1.00};
+        let bg = WHITE;
+        const dLeft = daysLeft(expiryCell);
+        if (dLeft < 0) bg = RED;
+        else if (dLeft <= 5) bg = YEL;
+
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SHEET_ID,
+          requestBody: {
+            requests: [{
+              repeatCell: {
+                range: {
+                  sheetId,
+                  startRowIndex: usedRow,
+                  endRowIndex: usedRow + 1,
+                  startColumnIndex: idxExpiry,
+                  endColumnIndex: idxExpiry + 1
+                },
+                cell: { userEnteredFormat: { backgroundColor: bg } },
+                fields: "userEnteredFormat.backgroundColor"
+              }
+            }]
+          }
+        });
+      }
+    }
+
+    return res.status(200).json({
+      access,
+      gpt: expectedId,
+      name: rawName || null,
+      expiry: expiryCell || null
+    });
+
+  }catch(err){
+    console.error("checkAccess error:", err);
+    return res.status(500).json({ access:false, error: err.message, stack: err.stack });
+  }
+}
