@@ -2,30 +2,26 @@
 import { google } from "googleapis";
 import { JWT } from "google-auth-library";
 
-// ====== Map x-gpt-key -> gptId ======
 const GPT_KEY_MAP = {
-  "BC_01": "gpt-bc",      // Trợ lý Báo cáo
-  "GA_01": "gpt-ga",      // Trợ lý Giáo án
-  "VD_01": "gpt-vid",   // Trợ lý Videos
-  // Thêm các GPT khác tại đây...
+  "BC_01": "gpt-bc",
+  "GA_01": "gpt-ga",
+  "VD_01": "gpt-video",
 };
 
-// ====== Các cột header hợp lệ ======
 const HDR = {
   EMAIL: [
     "email", "email được phép sử dụng gpts", "địa chỉ email",
     "email duoc phep su dung gpts", "mail"
   ],
   EXPIRE: [
-    "thời hạn sử dụng gpts", "thời hạn sử dụng", "ngày hết hạn", "hạn sử dụng",
+    "thời hạn sử dụng gpts", "ngày hết hạn", "hạn sử dụng",
     "han su dung", "thoi han su dung gpts", "expire", "expiry", "expiration"
   ],
   GPT_ID: [
-    "gpts id", "gpt id", "gptsid", "gptid", "mã gpt", "ma gpt", "id"
+    "gpts id", "gpt id", "mã gpt", "ma gpt", "id"
   ],
 };
 
-// ====== Hàm tiện ích ======
 function normLower(s = "") { return String(s).trim().toLowerCase(); }
 function stripDiacritics(s = "") {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -46,49 +42,37 @@ function headerIndex(headerRow, candidates) {
   return -1;
 }
 
-function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
-
-// Parse ngày theo dd/MM/yyyy (ưu tiên) + fallback
+function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function parseDate(s) {
   const t = String(s || "").trim();
   if (!t) return null;
-
-  // dd/MM/yyyy
   const mVn = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(t);
   if (mVn) return new Date(+mVn[3], +mVn[2] - 1, +mVn[1]);
-
-  // yyyy-MM-dd
   const mIso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
   if (mIso) return new Date(+mIso[1], +mIso[2] - 1, +mIso[3]);
-
-  // Google Sheets serial date
   const n = Number(t);
   if (!Number.isNaN(n) && n > 25000) {
     const base = new Date(Date.UTC(1899, 11, 30));
     return new Date(base.getTime() + n * 86400000);
   }
-
   return null;
 }
-
 function notExpired(expiryStr) {
   const d = parseDate(expiryStr);
   if (!d) return false;
   return startOfDay(d) >= startOfDay(new Date());
 }
 
-// ====== API chính ======
 export default async function handler(req, res) {
   try {
     const email = normLower(req.query.email);
     const key = String(req.headers["x-gpt-key"] || "").trim();
-    const gptFromQuery = normLower(req.query.gpt || ""); // fallback
-
+    const gptFromQuery = normLower(req.query.gpt || "");
     const mapped = GPT_KEY_MAP[key] || "";
     const gptId = normLower(mapped || gptFromQuery);
 
     if (!email || !gptId) {
-      return res.status(400).json({ access: false, error: "Missing email or GPT identifier (x-gpt-key or gpt)" });
+      throw new Error("Missing email or GPT identifier (x-gpt-key or gpt)");
     }
 
     const auth = new JWT({
@@ -109,20 +93,18 @@ export default async function handler(req, res) {
 
     const values = resp.data.values || [];
     if (values.length === 0) {
-      return res.status(200).json({ access: false, gpt: gptId, expiry: null });
+      return res.status(200).json({ access: false, gpt: gptId, expiry: null, debug: "Sheet is empty" });
     }
 
-    // Lấy index cột
     const header = values[0];
     const idxEmail  = headerIndex(header, HDR.EMAIL);
     const idxExpiry = headerIndex(header, HDR.EXPIRE);
     const idxGptId  = headerIndex(header, HDR.GPT_ID);
 
     if (idxEmail < 0 || idxGptId < 0 || idxExpiry < 0) {
-      return res.status(500).json({ access: false, error: "Header mapping failed. Check column titles." });
+      throw new Error(`Header mapping failed. Found: ${JSON.stringify(header)}`);
     }
 
-    // Duyệt từng dòng
     let matchedExpiry = null;
     let ok = false;
 
@@ -133,7 +115,6 @@ export default async function handler(req, res) {
       const ex = row[idxExpiry];
 
       if (!e || !g) continue;
-
       if (e === email && g === gptId) {
         matchedExpiry = ex || null;
         ok = notExpired(ex);
@@ -142,9 +123,12 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({ access: ok, gpt: gptId, expiry: matchedExpiry });
-
   } catch (err) {
     console.error("checkAccess error:", err);
-    return res.status(500).json({ access: false, error: "Server error" });
+    return res.status(500).json({
+      access: false,
+      error: err.message || "Server error",
+      stack: err.stack,
+    });
   }
 }
