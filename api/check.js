@@ -10,15 +10,15 @@ const GPT_KEY_MAP = {
 
 const HDR = {
   EMAIL: [
-    "email", "email được phép sử dụng gpts", "địa chỉ email",
+    "email", "email được phép sử dụng gpts", "email được phép sử dụng", "email cho phép sử dụng gpts", "địa chỉ email",
     "email duoc phep su dung gpts", "mail"
   ],
   EXPIRE: [
-    "thời hạn sử dụng gpts", "ngày hết hạn", "hạn sử dụng",
+    "thời hạn sử dụng gpts", "thời hạn sử dụng", "ngày hết hạn", "hạn sử dụng",
     "han su dung", "thoi han su dung gpts", "expire", "expiry", "expiration"
   ],
   GPT_ID: [
-    "gpts id", "gpt id", "mã gpt", "ma gpt", "id"
+    "gpts id", "gpt id", "gptid", "gptsid", "mã gpt", "ma gpt", "id"
   ],
 };
 
