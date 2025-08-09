@@ -76,11 +76,11 @@ async function sendEmail(to, subject, text) {
 // ===== Header aliases =====
 const HDR = {
   EMAIL: ["email", "email được phép sử dụng gpts", "email cho phép sử dụng gpts", "địa chỉ email", "email duoc phep su dung gpts"],
-  EXPIRE: ["thời hạn sử dụng gpts", "thời hạn sử dụng", "ngày hết hạn", "hạn sử dụng", "thoi han su dung gpts", "han su dung"],
-  GPT_ID: ["id", "gpt id", "gpts id", "mã gpt", "ma gpt"],
-  GPT_NAME: ["tên gpts", "ten gpts", "ten gpt", "tên gpt"],
-  SENT_5D: ["đã gửi trước 5 ngày", "nhắc trước 5 ngày", "nhắc hạn trước 5 ngày", "da gui truoc 5 ngay", "sent 5d", "nhac 5 ngay"],
-  SENT_1D: ["đã gửi trước 1 ngày", "nhắc trước 1 ngày", "nhắc hạn trước 1 ngày", "da gui truoc 1 ngay", "sent 1d", "nhac 1 ngay"],
+  EXPIRE: ["thời hạn sử dụng gpts", "thời hạn sử dụng", "ngày hết hạn", "hạn sử dụng", "Expiry", "thoi han su dung gpts", "han su dung"],
+  GPT_ID: ["id", "gpt id", "gpts id", "GPTs ID", "mã gpt", "ma gpt"],
+  GPT_NAME: ["tên gpts", "ten gpts", "GPTs Name", "ten gpt", "tên gpt"],
+  SENT_5D: ["đã gửi trước 5 ngày", "Sent 5d", "nhắc trước 5 ngày", "nhắc hạn trước 5 ngày", "da gui truoc 5 ngay", "sent 5d", "nhac 5 ngay"],
+  SENT_1D: ["đã gửi trước 1 ngày", "Sent 1d", "nhắc trước 1 ngày", "nhắc hạn trước 1 ngày", "da gui truoc 1 ngay", "sent 1d", "nhac 1 ngay"],
 };
 
 // ===== Main =====
