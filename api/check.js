@@ -1,124 +1,150 @@
-// api/check.js
-const { google } = require("googleapis");
-const { JWT } = require("google-auth-library");
+// /api/check.js
+import { google } from "googleapis";
+import { JWT } from "google-auth-library";
 
-// ====== ENV cần có ======
-// SHEET_ID=...
-// GOOGLE_CLIENT_EMAIL=...@...iam.gserviceaccount.com
-// GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n....\n-----END PRIVATE KEY-----\n"
-// (tuỳ chọn) SHEET_NAME=Sheet1
+// ====== Map x-gpt-key -> gptId ======
+const GPT_KEY_MAP = {
+  "BC_01": "gpt-bc",      // Trợ lý Báo cáo
+  "GA_01": "gpt-ga",      // Trợ lý Giáo án
+  "VD_01": "gpt-video",   // Trợ lý Videos
+  // Thêm các GPT khác tại đây...
+};
 
-function normalizeHeader(h) {
-  return String(h || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/[:*()【】\[\]{}]/g, "");
+// ====== Các cột header hợp lệ ======
+const HDR = {
+  EMAIL: [
+    "email", "email được phép sử dụng gpts", "địa chỉ email",
+    "email duoc phep su dung gpts", "mail"
+  ],
+  EXPIRE: [
+    "thời hạn sử dụng gpts", "thời hạn sử dụng", "ngày hết hạn", "hạn sử dụng",
+    "han su dung", "thoi han su dung gpts", "expire", "expiry", "expiration"
+  ],
+  GPT_ID: [
+    "gpts id", "gpt id", "gptsid", "gptid", "mã gpt", "ma gpt", "id"
+  ],
+};
+
+// ====== Hàm tiện ích ======
+function normLower(s = "") { return String(s).trim().toLowerCase(); }
+function stripDiacritics(s = "") {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
-function findColIdx(headers, aliases) {
-  const normalized = headers.map(normalizeHeader);
-  for (const alias of aliases) {
-    const i = normalized.indexOf(normalizeHeader(alias));
-    if (i !== -1) return i;
+function normalizeHeader(s = "") {
+  return stripDiacritics(normLower(s));
+}
+function headerIndex(headerRow, candidates) {
+  const want = candidates.map(normalizeHeader);
+  for (let i = 0; i < headerRow.length; i++) {
+    const h = normalizeHeader(headerRow[i] || "");
+    if (want.includes(h)) return i;
+  }
+  for (let i = 0; i < headerRow.length; i++) {
+    const h = normalizeHeader(headerRow[i] || "");
+    if (want.some(w => h.startsWith(w))) return i;
   }
   return -1;
 }
 
-function parseDDMMYYYY(s) {
-  if (!s) return null;
-  const [dd, mm, yyyy] = String(s).split("/").map(Number);
-  if (!dd || !mm || !yyyy) return null;
-  return new Date(yyyy, mm - 1, dd);
+function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+
+// Parse ngày theo dd/MM/yyyy (ưu tiên) + fallback
+function parseDate(s) {
+  const t = String(s || "").trim();
+  if (!t) return null;
+
+  // dd/MM/yyyy
+  const mVn = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(t);
+  if (mVn) return new Date(+mVn[3], +mVn[2] - 1, +mVn[1]);
+
+  // yyyy-MM-dd
+  const mIso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if (mIso) return new Date(+mIso[1], +mIso[2] - 1, +mIso[3]);
+
+  // Google Sheets serial date
+  const n = Number(t);
+  if (!Number.isNaN(n) && n > 25000) {
+    const base = new Date(Date.UTC(1899, 11, 30));
+    return new Date(base.getTime() + n * 86400000);
+  }
+
+  return null;
 }
 
-module.exports = async (req, res) => {
+function notExpired(expiryStr) {
+  const d = parseDate(expiryStr);
+  if (!d) return false;
+  return startOfDay(d) >= startOfDay(new Date());
+}
+
+// ====== API chính ======
+export default async function handler(req, res) {
   try {
-    const { email, gpt } = req.query;
-    if (!email || !gpt) {
-      return res.status(400).json({ error: "Thiếu email hoặc gpt trong query string." });
+    const email = normLower(req.query.email);
+    const key = String(req.headers["x-gpt-key"] || "").trim();
+    const gptFromQuery = normLower(req.query.gpt || ""); // fallback
+
+    const mapped = GPT_KEY_MAP[key] || "";
+    const gptId = normLower(mapped || gptFromQuery);
+
+    if (!email || !gptId) {
+      return res.status(400).json({ access: false, error: "Missing email or GPT identifier (x-gpt-key or gpt)" });
     }
 
-    const SHEET_ID = process.env.SHEET_ID;
-    const SHEET_NAME = process.env.SHEET_NAME || "Sheet1";
-
-    if (!SHEET_ID || !process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
-      return res.status(500).json({ error: "Thiếu biến môi trường cho Service Account." });
-    }
-
-    // Auth bằng Service Account (đọc được sheet private nếu đã share quyền)
     const auth = new JWT({
-      email: process.env.GOOGLE_CLIENT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
       scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
     });
 
     const sheets = google.sheets({ version: "v4", auth });
+    const sheetName = process.env.SHEET_NAME || "";
+    const sheetRange = process.env.SHEET_RANGE || "1:10000";
+    const range = sheetName ? `${sheetName}!${sheetRange}` : sheetRange;
 
-    // Đọc cả header + dữ liệu (chèn thêm cột cũng không sao)
-    const range = `${SHEET_NAME}!1:10000`;
     const resp = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
+      spreadsheetId: process.env.SHEET_ID,
       range,
     });
 
-    const rows = resp.data.values || [];
-    if (rows.length < 2) {
-      return res.status(200).json({ access: false, reason: "Sheet trống hoặc thiếu dữ liệu." });
+    const values = resp.data.values || [];
+    if (values.length === 0) {
+      return res.status(200).json({ access: false, gpt: gptId, expiry: null });
     }
 
-    const headers = rows[0];
+    // Lấy index cột
+    const header = values[0];
+    const idxEmail  = headerIndex(header, HDR.EMAIL);
+    const idxExpiry = headerIndex(header, HDR.EXPIRE);
+    const idxGptId  = headerIndex(header, HDR.GPT_ID);
 
-    // Dò vị trí cột theo header (nhiều biến thể)
-    const idxEmail = findColIdx(headers, ["email", "email cho phép sử dụng gpts", "Email được phép sử dụng GPTs", "địa chỉ email"]);
-    const idxExpire = findColIdx(headers, ["thời hạn sử dụng gpts", "ngày hết hạn", "Thời hạn sử dụng", "hạn sử dụng"]);
-    const idxGptId = findColIdx(headers, ["id", "gpt id", "mã gpt", "GPTs ID", "ma gpt"]);
-
-    if (idxEmail === -1 || idxGptId === -1) {
-      return res.status(500).json({ error: "Không tìm thấy cột Email hoặc GPT ID trong Sheet." });
+    if (idxEmail < 0 || idxGptId < 0 || idxExpiry < 0) {
+      return res.status(500).json({ access: false, error: "Header mapping failed. Check column titles." });
     }
 
-    const today = new Date();
+    // Duyệt từng dòng
+    let matchedExpiry = null;
+    let ok = false;
 
-    for (let r = 1; r < rows.length; r++) {
-      const row = rows[r] || [];
-      const rowEmail = row[idxEmail]?.trim().toLowerCase();
-      const rowGptId = row[idxGptId]?.trim();
-      const expiryStr = idxExpire !== -1 ? row[idxExpire]?.trim() : ""; // có thể không có cột hạn
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i] || [];
+      const e = normLower(row[idxEmail] || "");
+      const g = normLower(row[idxGptId] || "");
+      const ex = row[idxExpiry];
 
-      if (rowEmail === email.toLowerCase()) {
-        if (rowGptId !== gpt) {
-          return res.status(200).json({
-            access: false,
-            reason: "Sai GPT ID",
-            gptExpected: rowGptId || null,
-          });
-        }
+      if (!e || !g) continue;
 
-        if (!expiryStr) {
-          // Không có hạn => cho phép
-          return res.status(200).json({ access: true, gpt, expiry: null });
-        }
-
-        const expiryDate = parseDDMMYYYY(expiryStr);
-        if (!expiryDate) {
-          return res.status(200).json({
-            access: false,
-            reason: "Định dạng ngày hết hạn không hợp lệ (yêu cầu dd/mm/yyyy)",
-            expiry: expiryStr,
-          });
-        }
-
-        if (today <= expiryDate) {
-          return res.status(200).json({ access: true, gpt, expiry: expiryStr });
-        } else {
-          return res.status(200).json({ access: false, reason: "Hết hạn sử dụng", expiry: expiryStr });
-        }
+      if (e === email && g === gptId) {
+        matchedExpiry = ex || null;
+        ok = notExpired(ex);
+        break;
       }
     }
 
-    return res.status(200).json({ access: false, reason: "Không có trong danh sách" });
+    return res.status(200).json({ access: ok, gpt: gptId, expiry: matchedExpiry });
+
   } catch (err) {
-    console.error("[SERVER ERROR]", err?.message || err);
-    return res.status(500).json({ error: "Lỗi server nội bộ." });
+    console.error("checkAccess error:", err);
+    return res.status(500).json({ access: false, error: "Server error" });
   }
-};
+}
