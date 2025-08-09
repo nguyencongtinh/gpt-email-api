@@ -5,23 +5,22 @@ import { JWT } from "google-auth-library";
 /** ===== ENV / CONFIG ===== */
 const SHEET_ID    = process.env.SHEET_ID;
 const SHEET_NAME  = process.env.SHEET_NAME || "";          // rỗng = sheet đầu
-const SHEET_RANGE = process.env.SHEET_RANGE || "1:10000";  // đọc cả header
-const DEFAULT_GPT_ID   = process.env.DEFAULT_GPT_ID || ""; // ví dụ: gpt-bc
-const DEFAULT_GPT_NAME = process.env.DEFAULT_GPT_NAME || "";// ví dụ: Trợ lý Báo cáo
+const SHEET_RANGE = process.env.SHEET_RANGE || "1:10000";  // vùng dữ liệu user (bao gồm header hàng 1)
 
-// Map header -> { id, name } (tùy chọn, khoá cứng từng GPT)
-const GPT_KEY_MAP = {
-  // "BC_01": { id: "gpt-bc",  name: "Trợ lý Báo cáo" },
-  // "GA_01": { id: "gpt-ga",  name: "Trợ lý Giáo án" },
-  // "VD_01": { id: "gpt-vid", name: "Trợ lý Video"  },
-};
+// Tab Config để map key -> {id, name}
+const MAP_SHEET_NAME = process.env.MAP_SHEET_NAME || "Config";
+const MAP_RANGE      = process.env.MAP_RANGE || "A1:D1000";
+
+// Fallback cuối cùng khi không có key và không truyền query
+const DEFAULT_GPT_ID   = process.env.DEFAULT_GPT_ID || "";
+const DEFAULT_GPT_NAME = process.env.DEFAULT_GPT_NAME || "";
 
 /** ===== HEADER NAMES (linh hoạt) ===== */
 const HDR = {
   EMAIL:   ["email", "email duoc phep su dung gpts", "email được phép sử dụng gpts", "địa chỉ email", "mail"],
   EXPIRE:  ["thời hạn sử dụng", "thời hạn sử dụng gpts", "ngày hết hạn", "hạn sử dụng", "thoi han su dung", "han su dung", "expiry", "expiration", "expire"],
   GPT_ID:  ["gpts id", "gpt id", "mã gpt", "ma gpt", "id"],
-  GPT_NAME:["tên gpts", "gpts name", "ten gpts", "ten gpt", "tên gpt", "name", "ten"],
+  GPT_NAME:["gpts name", "tên gpts", "ten gpts", "ten gpt", "tên gpt", "name", "ten"],
 };
 
 /** ===== Helpers ===== */
@@ -59,7 +58,37 @@ function daysLeft(expiryStr){
   return Math.round((startOfDay(d)-startOfDay(new Date()))/86400000);
 }
 
-/** ===== Main ===== */
+/** ===== Đọc map key -> {id,name} từ tab Config ===== */
+async function resolveKeyToGpt(sheets, spreadsheetId, key) {
+  if (!key) return null;
+  const range = `${MAP_SHEET_NAME}!${MAP_RANGE}`;
+  const resp = await sheets.spreadsheets.values.get({ spreadsheetId, range });
+  const rows = resp.data.values || [];
+  if (!rows.length) return null;
+
+  // Chuẩn hoá tên cột
+  const header = rows[0].map(v => (v || "").toString().trim().toLowerCase());
+  const idxKey  = header.findIndex(h => ["key"].includes(h));
+  const idxId   = header.findIndex(h => ["gpts id","gpt id","id"].includes(h));
+  const idxName = header.findIndex(h => ["gpts name","tên gpts","ten gpts","name"].includes(h));
+  const idxAct  = header.findIndex(h => ["active","enabled"].includes(h));
+  if (idxKey < 0 || idxId < 0 || idxName < 0) return null;
+
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const k = (r[idxKey]  || "").toString().trim();
+    const a = idxAct >= 0 ? (r[idxAct] || "").toString().trim().toLowerCase() : "true";
+    if (k === key && (a === "true" || a === "1" || a === "yes" || a === "x")) {
+      return {
+        id:   (r[idxId]   || "").toString().trim(),
+        name: (r[idxName] || "").toString().trim(),
+      };
+    }
+  }
+  return null;
+}
+
+/** ===== MAIN ===== */
 export default async function handler(req, res){
   try{
     if(!SHEET_ID) return res.status(500).json({access:false,error:"Missing SHEET_ID env var"});
@@ -67,22 +96,7 @@ export default async function handler(req, res){
     const email = normLower(req.query.email || "");
     if(!email) return res.status(400).json({access:false,error:"Missing email"});
 
-    // Lấy gpt & name theo ưu tiên: header -> query -> ENV mặc định
-    const key = String(req.headers["x-gpt-key"]||"").trim();
-    const mapped = key ? GPT_KEY_MAP[key] : null;
-
-    const queryGpt  = normLower(req.query.gpt || "");
-    let   queryName = req.query.name || "";
-    try { queryName = decodeURIComponent(queryName); } catch(_e) {}
-    const gptId   = normLower(mapped?.id || queryGpt || DEFAULT_GPT_ID);
-    const gptName = (mapped?.name || queryName || DEFAULT_GPT_NAME).trim();
-    const gptNameNoDia = normNoDia(gptName);
-
-    if(!gptId || !gptName){
-      return res.status(400).json({access:false,error:"Missing GPT id/name and no defaults configured"});
-    }
-
-    // Auth (cần quyền sửa để tô màu Expiry)
+    // 1) Auth (cần quyền sửa để tô màu Expiry)
     const auth = new JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       key: (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g,"\n"),
@@ -90,9 +104,29 @@ export default async function handler(req, res){
     });
     const sheets = google.sheets({version:"v4", auth});
 
-    // Đọc sheet
-    const range = (SHEET_NAME?`${SHEET_NAME}!`:"") + SHEET_RANGE;
-    const resp  = await sheets.spreadsheets.values.get({ spreadsheetId:SHEET_ID, range });
+    // 2) Lấy gpt/name theo ưu tiên: header key -> query key -> query gpt/name -> ENV
+    const keyHeader = String(req.headers["x-gpt-key"] || "").trim();
+    const keyQuery  = String(req.query.key || "").trim();
+
+    let mapped = null;
+    if (keyHeader) mapped = await resolveKeyToGpt(sheets, SHEET_ID, keyHeader);
+    if (!mapped && keyQuery) mapped = await resolveKeyToGpt(sheets, SHEET_ID, keyQuery);
+
+    const queryGpt  = normLower(req.query.gpt || "");
+    let   queryName = req.query.name || "";
+    try { queryName = decodeURIComponent(queryName); } catch (_e) {}
+
+    const gptId   = normLower(mapped?.id   || queryGpt || DEFAULT_GPT_ID);
+    const gptName =        (mapped?.name || queryName || DEFAULT_GPT_NAME).trim();
+    const gptNameNoDia = normNoDia(gptName);
+
+    if(!gptId || !gptName){
+      return res.status(400).json({access:false,error:"Missing GPT id/name and no mapping/defaults"});
+    }
+
+    // 3) Đọc dữ liệu user
+    const userRange = (SHEET_NAME?`${SHEET_NAME}!`:"") + SHEET_RANGE;
+    const resp  = await sheets.spreadsheets.values.get({ spreadsheetId:SHEET_ID, range: userRange });
     const values = resp.data.values || [];
     if(values.length===0) return res.status(200).json({access:false,gpt:gptId,name:gptName,expiry:null,debug:"Sheet empty"});
 
@@ -106,7 +140,7 @@ export default async function handler(req, res){
       return res.status(500).json({access:false,error:"Header mapping failed",headers:header});
     }
 
-    // Tìm dòng: ưu tiên EXACT (Email+ID+Name) > WILDCARD (ID="*", Name="*" hoặc rỗng)
+    // 4) Tìm dòng: ưu tiên EXACT (Email+ID+Name) > WILDCARD (ID="*", Name="*" hoặc rỗng)
     let exactRow=-1, exactExp=null;
     let starRow=-1,  starExp=null;
 
@@ -128,7 +162,7 @@ export default async function handler(req, res){
     const access = usedRow>0 ? notExpired(expiryCell) : false;
     const dLeft  = usedRow>0 ? (expiryCell? daysLeft(expiryCell) : null) : null;
 
-    // Tô màu ô Expiry của dòng usedRow (nếu có)
+    // 5) Tô màu ô Expiry của dòng usedRow (nếu có)
     if(usedRow>0){
       const meta = await sheets.spreadsheets.get({
         spreadsheetId: SHEET_ID,
