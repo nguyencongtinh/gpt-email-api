@@ -1,16 +1,15 @@
-openapi: 3.1.0
+openapi: 3.0.3
 info:
-  title: GPT Access Checker API (Auto Key)
-  version: 1.0.0
-  description: >
-    Check access by email. The server auto-assigns GPT ID & Name based on key mapping in Google Sheets.
+  title: GPT Access Checker API (Query Key)
+  version: 1.0.1
+  description: Check access by email. Uses query key or gpt/name.
 servers:
-  - url: https://gpt-email-api.vercel.app/api/check?email={{user_email}}
+  - url: https://gpt-email-api.vercel.app
 paths:
   /api/check:
     get:
-      summary: Check user access with auto key
-      operationId: checkAccessAutoKey
+      summary: Check access
+      operationId: checkAccess
       parameters:
         - name: email
           in: query
@@ -19,9 +18,27 @@ paths:
           schema:
             type: string
             format: email
+        - name: key
+          in: query
+          required: false
+          description: GPT key (e.g. BC_01, GA_01, VD_01)
+          schema:
+            type: string
+        - name: gpt
+          in: query
+          required: false
+          description: GPT ID if no key (e.g. gpt-bc)
+          schema:
+            type: string
+        - name: name
+          in: query
+          required: false
+          description: GPT Name if no key (e.g. Tro ly Bao cao)
+          schema:
+            type: string
       responses:
         "200":
-          description: Access check result
+          description: Result
           content:
             application/json:
               schema:
@@ -35,7 +52,12 @@ paths:
                     type: string
                   expiry:
                     type: string
+                    nullable: true
                   daysLeft:
                     type: integer
+                    nullable: true
                   match:
                     type: string
+                  error:
+                    type: string
+                    nullable: true
