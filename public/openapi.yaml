@@ -9,7 +9,7 @@ paths:
   /api/check:
     get:
       summary: Check access (requires key)
-      operationId: checkAccessWithKeyV3
+      operationId: checkAccessWithKey
       parameters:
         - name: email
           in: query
