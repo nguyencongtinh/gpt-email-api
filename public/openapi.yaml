@@ -1,15 +1,16 @@
 openapi: 3.1.0
 info:
-  title: GPT Access Checker API
-  version: 1.1.2
-  description: "Check access by email + GPT ID + GPT Name + expiry. If header x-gpt-key is sent, the server maps it to id/name; the spec lists only query params."
+  title: GPT Access Checker API (Auto Key)
+  version: 1.0.0
+  description: >
+    Check access by email. The server auto-assigns GPT ID & Name based on key mapping in Google Sheets.
 servers:
-  - url: https://gpt-email-api.vercel.app
+  - url: https://gpt-email-api.vercel.app/api/check?email={{user_email}}
 paths:
   /api/check:
     get:
-      summary: Check user access
-      operationId: checkAccess
+      summary: Check user access with auto key
+      operationId: checkAccessAutoKey
       parameters:
         - name: email
           in: query
@@ -18,21 +19,9 @@ paths:
           schema:
             type: string
             format: email
-        - name: gpt
-          in: query
-          required: false
-          description: GPT ID (e.g. gpt-bc, gpt-ga). Required if header mapping is not used.
-          schema:
-            type: string
-        - name: name
-          in: query
-          required: false
-          description: GPT Name (e.g. Tro ly Bao cao). Required if header mapping is not used.
-          schema:
-            type: string
       responses:
         "200":
-          description: OK
+          description: Access check result
           content:
             application/json:
               schema:
@@ -44,17 +33,9 @@ paths:
                     type: string
                   name:
                     type: string
-                    nullable: true
                   expiry:
                     type: string
-                    nullable: true
-                    description: "dd/MM/yyyy or null (no limit)"
                   daysLeft:
                     type: integer
-                    nullable: true
                   match:
                     type: string
-                    enum: [exact, wildcard, none]
-                  error:
-                    type: string
-                    nullable: true
