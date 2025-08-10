@@ -1,64 +1,52 @@
 openapi: 3.1.0
 info:
-  title: GPT Access Checker API (Header & Query Key)
-  version: 1.0.2
-  description: |
-    Check access by email. Supports:
-    - Header `x-gpt-key`
-    - Query `key`
-    - Query `gpt` & `name`
+  title: GPT Access Checker API (Require Key)
+  version: 1.0.4
+  description: Check access by email. Requires query key (BC_01, GA_01, VD_01).
 servers:
   - url: https://gpt-email-api.vercel.app
 paths:
   /api/check:
     get:
-      summary: Check access (email + optional key)
-      operationId: checkAccess
+      summary: Check access (requires key)
+      operationId: checkAccessWithKeyV3
       parameters:
         - name: email
           in: query
           required: true
+          description: User email to check
           schema:
             type: string
             format: email
-          description: User email to check
-        - name: x-gpt-key
-          in: header
-          required: false
-          schema:
-            type: string
-          description: GPT key in request header (priority)
         - name: key
           in: query
-          required: false
+          required: true
+          description: GPT key (e.g. BC_01 for Báo cáo, GA_01 for Giáo án, VD_01 for Video)
           schema:
             type: string
-          description: GPT key in query string (fallback 1)
-        - name: gpt
-          in: query
-          required: false
-          schema:
-            type: string
-          description: GPT ID in query string (fallback 2)
-        - name: name
-          in: query
-          required: false
-          schema:
-            type: string
-          description: GPT Name in query string (fallback 3)
+            example: BC_01
       responses:
         "200":
-          description: Access check result
+          description: Result
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  success:
+                  access:
                     type: boolean
-                  message:
+                  gpt:
                     type: string
-        "400":
-          description: Invalid request
-        "403":
-          description: Access denied
+                  name:
+                    type: string
+                  expiry:
+                    type: string
+                    nullable: true
+                  daysLeft:
+                    type: integer
+                    nullable: true
+                  match:
+                    type: string
+                  error:
+                    type: string
+                    nullable: true
