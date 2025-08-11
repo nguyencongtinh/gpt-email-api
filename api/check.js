@@ -9,7 +9,7 @@ const SHEET_RANGE = process.env.SHEET_RANGE || "1:10000";  // vùng dữ liệu 
 
 // Tab Config để map key -> {id, name}
 const MAP_SHEET_NAME = process.env.MAP_SHEET_NAME || "Config";
-const MAP_RANGE      = process.env.MAP_RANGE || "A1:D1000";
+const MAP_RANGE      = process.env.MAP_RANGE || "A1:K1000";
 
 // Fallback cuối cùng khi không có key và không truyền query
 const DEFAULT_GPT_ID   = process.env.DEFAULT_GPT_ID || "";
